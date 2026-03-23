@@ -31,7 +31,7 @@ runcmd:
 
     echo ">>> [GIT] 비공개 저장소 클론 중..."
     sudo -u qheo22 rm -rf /home/qheo22/k8s-project
-    sudo -u qheo22 git clone https://github.com/qheo22-tech/k8s-project.git
+    sudo -u qheo22 git clone https://github.com/qheo22-tech/k8s-project.git /home/qheo22/k8s-project
 
     BASE="/home/qheo22/k8s-project/my-k8s-infrastructure/infra"
 
