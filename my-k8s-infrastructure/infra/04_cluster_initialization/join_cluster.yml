@@ -1,0 +1,29 @@
+---
+- name: Join Worker Nodes to Cluster
+  hosts: workers
+  become: yes
+  tasks:
+    - name: Get join command from master
+      delegate_to: localhost
+      shell: kubeadm token create --print-join-command
+      register: join_command_raw
+
+    - name: Reset existing kubernetes setup on workers
+      shell: kubeadm reset -f
+
+    - name: Remove old CNI and config directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/cni/net.d
+        - /var/lib/kubelet
+        - /etc/kubernetes/pki
+
+    - name: Join the cluster now
+      shell: "{{ join_command_raw.stdout }}"
+      register: join_result
+
+    - name: Show join result
+      debug:
+        msg: "{{ join_result.stdout }}"

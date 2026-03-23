@@ -1,0 +1,30 @@
+# ==============================================================================
+# [02_kafka_topic.yaml] 
+# 역할: 데이터를 주고받을 통로(Topic) 생성
+# 특징: 
+#   1. 브로커 3대(worker2, 5, 7)에 최적화된 파티션 및 복제 설정
+#   2. 데이터 보관 주기 및 용량 제한 설정 포함
+# ==============================================================================
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: ticket-queue-requests-log
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: my-cluster # ⚠️ 01번 파일의 Kafka name과 반드시 일치해야 함
+spec:
+  # 💡 파티션: 데이터를 12개로 쪼개서 저장 (3대 브로커에 4개씩 예쁘게 분산됨)
+  partitions: 12 
+  
+  # 💡 복제본: 데이터 유실 방지를 위해 3개 복제 (2, 5, 7번 노드에 각각 한 개씩 저장)
+  replicas: 3
+  
+  config:
+    # 데이터 보관 주기: 7일 (ms 단위)
+    retention.ms: 604800000
+    # 파티션당 최대 세그먼트 크기: 1GB
+    segment.bytes: 1073741824
+    # 데이터 압축 방식: producer의 설정을 따름
+    compression.type: producer
+    min.insync.replicas: 1

@@ -1,0 +1,17 @@
+grafana:
+  enabled: true
+  # 대시보드 영구 저장을 위한 PVC 설정
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: "longhorn"  # 사용자님의 스토리지 클래스 이름
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+  # 초기 비밀번호 설정 (원하는 걸로 바꾸세요)
+  adminPassword: "admin"
+
+  # 서비스 타입 설정 (MetalLB 사용 시)
+  service:
+    type: LoadBalancer

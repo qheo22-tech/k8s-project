@@ -1,0 +1,23 @@
+# =========================================================
+# [내부 통신용 WAS 서비스 - was-service]
+# 1. 용도: 쿠버네티스 클러스터 내부에서 WAS 파드(Pod)들을 하나로 묶어주는 역할
+# 2. 특징: 
+#    - ClusterIP: 외부 노출 없이 클러스터 내부 IP만 생성 (보안 강화)
+#    - Ingress가 이 서비스의 80번 포트를 바라보고 트래픽을 전달함
+# 3. 연결: Deployment의 'app: my-was' 라벨을 가진 파드들과 연결됨
+# =========================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: was-service
+  namespace: board-was
+spec:
+  # Ingress Controller(L7)가 트래픽을 배분해주므로, 
+  # 노드 포트를 직접 열지 않는 ClusterIP 방식이 가장 표준적이고 안전합니다.
+  type: ClusterIP 
+  selector:
+    app: my-was   # Deployment 스펙의 labels.app과 반드시 일치해야 함
+  ports:
+    - protocol: TCP
+      port: 80          # 서비스가 내부적으로 노출하는 포트 (Ingress가 여기로 접속)
+      targetPort: 8080  # 실제 WAS 파드(Spring Boot/Tomcat)가 사용 중인 포트

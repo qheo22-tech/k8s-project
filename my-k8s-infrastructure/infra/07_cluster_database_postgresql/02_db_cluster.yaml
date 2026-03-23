@@ -1,0 +1,42 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: my-postgres
+  namespace: database
+spec:
+  instances: 1  # 1 Primary(Master), 2 Standby(Slave)
+
+# --- 이 부분을 추가하세요 ---
+  postgresql:
+    parameters:
+      synchronous_commit: "on"      # TPS 6,000의 벽을 뚫는 핵심 설정
+      commit_delay: "10000"          # 커밋을 모아서 처리 (성능 향상)
+      commit_siblings: "10"
+      max_wal_size: "2GB"            # 대량 인서트 시 체크포인트 부하 감소
+  # --------------------------
+ 
+  # 저장소 설정 (96GB 하드 구역 활용)
+  storage:
+    size: 20Gi
+    storageClass: longhorn
+
+  # [중요] 카프카 노드(2,5,7)를 피해서 1, 3, 4번 노드 조준
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - worker1
+                  - worker3
+                  - worker4
+
+  # DB 초기화 설정
+  bootstrap:
+    initdb:
+      database: postgres
+      owner: postgres
+      secret:
+        name: db-user-password

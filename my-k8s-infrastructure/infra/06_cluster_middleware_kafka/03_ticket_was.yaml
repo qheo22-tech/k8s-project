@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-was-app
+  namespace: board-was
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-was
+  template:
+    metadata:
+      labels:
+        app: my-was
+    spec:
+      containers:
+      - name: my-was-app
+        image: qheo22/my-was:v2
+        env:
+        - name: SPRING_KAFKA_LISTENER_CONCURRENCY
+          value: "12"
+        - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          value: "my-cluster-kafka-bootstrap.kafka:9092"
+        # DB URL 설정 (TX와 LOG 둘 다 넣어줘야 안전합니다)
+        - name: SPRING_DATASOURCE_TX_URL
+          value: "jdbc:postgresql://my-postgres-rw.database:5432/postgres?reWriteBatchedInserts=true"
+        - name: SPRING_DATASOURCE_TX_HIKARI_JDBC_URL
+          value: "jdbc:postgresql://my-postgres-rw.database:5432/postgres?reWriteBatchedInserts=true"
+        - name: SPRING_DATASOURCE_LOG_URL
+          value: "jdbc:postgresql://my-postgres-rw.database:5432/postgres?reWriteBatchedInserts=true"
+        - name: SPRING_DATASOURCE_LOG_HIKARI_JDBC_URL
+          value: "jdbc:postgresql://my-postgres-rw.database:5432/postgres?reWriteBatchedInserts=true"
+        # DB 계정 정보
+        - name: SPRING_DATASOURCE_TX_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: db-user-password
+        - name: SPRING_DATASOURCE_TX_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: db-user-password
+        - name: SPRING_DATASOURCE_LOG_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: db-user-password
+        - name: SPRING_DATASOURCE_LOG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: db-user-password
+        # 기타 필수 설정
+        - name: SPRING_DATA_REDIS_HOST
+          value: "my-redis-master.redis"
+        - name: SPRING_DATA_REDIS_PORT
+          value: "6379"
+        - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+          value: "update"

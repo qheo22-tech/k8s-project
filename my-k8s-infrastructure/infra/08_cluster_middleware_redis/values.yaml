@@ -1,0 +1,59 @@
+# [참고]
+# 카프카의 경우 기존에 yaml 방식을 사용한 오퍼레이터로 따로 만든 게 아니고
+# helm을 사용해서 만들었음. 레디스 오퍼레이터 역시 helm으로 설치했으므로
+# 이 폴더에는 00_operator.yaml 파일이 존재하지 않음.
+
+# [최종 클린 버전] values.yaml
+
+# 1. 기본 정보 및 이미지 (따옴표 안에 공백 없게 주의!)
+clusterSize: 3
+image: "redis:7.0.12-alpine"
+
+# 2. 특정 노드 고정 배치 (redis=true 라벨 확인됨)
+nodeSelector:
+  redis: "true"
+
+# 3. 분산 배치 설정 (Affinity)
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - redis
+      topologyKey: "kubernetes.io/hostname"
+
+# 4. 리소스 제한 및 헬스체크 (절대 빼면 안 되는 안전장치)
+resources:
+  requests:
+    cpu: "500m"
+    memory: "2Gi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+livenessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+
+# 5. 롱혼 스토리지 설정
+storage:
+  volumeClaimTemplate:
+    spec:
+      storageClassName: "longhorn"
+      resources:
+        requests:
+          storage: "10Gi"
+
+# 6. 레디스 내부 설정
+additionalRedisConfig: |
+  maxmemory 2gb
+  maxmemory-policy allkeys-lru
+
+# 7. 네트워크 서비스 설정
+service:
+  type: ClusterIP
+  port: 6379

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: update-hosts
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: update-hosts
+  template:
+    metadata:
+      labels:
+        name: update-hosts
+    spec:
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: update-hosts
+        image: alpine
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # 여기에 추가할 호스트 정보를 넣으세요
+            cat <<EOF >> /etc/hosts
+            192.168.0.10 k8s-master
+            192.168.0.11 worker1
+            192.168.0.12 worker2
+            192.168.0.13 worker3
+            192.168.0.14 worker4
+            192.168.0.200 worker5
+            192.168.0.201 worker6
+            192.168.0.202 worker7
+            EOF
+            echo "Hosts updated on $(hostname)"
+            sleep infinity
+        volumeMounts:
+        - name: host-etc-hosts
+          mountPath: /etc/hosts
+      volumes:
+      - name: host-etc-hosts
+        hostPath:
+          path: /etc/hosts

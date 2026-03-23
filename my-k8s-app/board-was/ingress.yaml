@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: board-ingress
+  namespace: board-was
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # [추가] /api 로 들어온 요청에서 /api를 떼고 WAS에 전달하는 마법
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    # 타임아웃 설정 (기존 동일)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: "my-was.internal"
+    http:
+      paths:
+      # 1. 웹 프론트엔드 (Node 7)
+      - path: /()(.*)  # 정규표현식으로 경로 캡처
+        pathType: Prefix
+        backend:
+          service:
+            name: web-service
+            port:
+              number: 80
+      # 2. WAS API (Node 5, 8)
+      - path: /api/?(.*) # /api 뒤의 모든 경로를 $1에 담음
+        pathType: Prefix
+        backend:
+          service:
+            name: was-service
+            port:
+              number: 80

@@ -1,0 +1,116 @@
+# =========================================================
+# [애플리케이션 배포 설정 - my-was-app v11]
+# 1. 역할: 게시판 서비스의 핵심 비즈니스 로직 처리 (WAS)
+# 2. 특징: 
+#    - 물리 PC 2대(미니/데스크탑) 간의 고가용성(HA) 배치
+#    - 카프카 배치 처리 및 컨슈머 병렬성 최적화
+#    - DB 하이버네이트 배치 인서트 및 커넥션 풀 최적화
+# =========================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-was-app
+  namespace: board-was
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-was
+  template:
+    metadata:
+      labels:
+        app: my-was
+    spec:
+      # ===== [핵심 추가: 물리 장비 및 노드 분산 배치] =====
+      affinity:
+        # 1. 특정 라벨이 붙은 노드에만 배포 (was="true" 및 pc-type 활용)
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: was
+                operator: In
+                values: ["true"]
+        # 2. 파드끼리 서로 다른 노드에 위치하도록 강제 (HA)
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: my-was
+            topologyKey: "kubernetes.io/hostname"
+      
+      # (선택사항) 물리 PC(pc-type) 간에 1:1로 균등하게 배치하고 싶을 때 사용
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: "pc-type"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: my-was
+
+      containers:
+      - name: my-was-app
+        image: qheo22/my-was:v11
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "3000m"
+        env:
+        # ===== [1. 톰캣 및 JVM 최적화] =====
+        - name: SERVER_TOMCAT_THREADS_MAX
+          value: "50"
+        - name: JAVA_OPTS
+          value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+        - name: SPRING_TASK_SCHEDULING_POOL_SIZE
+          value: "20"
+
+        # ===== [2. 카프카 병렬 처리 제어판] =====
+        - name: SPRING_KAFKA_LISTENER_BATCH_LISTENER
+          value: "true"
+        - name: SPRING_KAFKA_LISTENER_CONCURRENCY
+          value: "6"
+        - name: SPRING_KAFKA_CONSUMER_PROPERTIES_FETCH_MIN_BYTES
+          value: "524288"
+        - name: SPRING_KAFKA_CONSUMER_PROPERTIES_FETCH_MAX_WAIT_MS
+          value: "2000"
+        - name: SPRING_KAFKA_CONSUMER_MAX_POLL_RECORDS
+          value: "5000"
+        - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          value: "my-cluster-kafka-bootstrap.kafka:9092"
+        - name: SPRING_KAFKA_LISTENER_ACK_MODE
+          value: "manual_immediate"
+
+        # ===== [3. DB 설정 - TX & LOG] =====
+        # (중요) DB 주소는 서비스 이름을 사용하고 있으므로 그대로 유지합니다.
+        - name: SPRING_DATASOURCE_TX_URL
+          value: "jdbc:postgresql://my-postgres-rw.database:5432/postgres?reWriteBatchedInserts=true"
+        - name: SPRING_DATASOURCE_TX_HIKARI_MAXIMUM_POOL_SIZE
+          value: "150"
+        - name: SPRING_DATASOURCE_TX_USERNAME
+          valueFrom:
+            secretKeyRef: { name: db-user-password, key: username }
+        - name: SPRING_DATASOURCE_TX_PASSWORD
+          valueFrom:
+            secretKeyRef: { name: db-user-password, key: password }
+
+        # ===== [4. 기타 및 최적화 설정] =====
+        - name: SPRING_DATA_REDIS_HOST
+          # 가급적 서비스 도메인(예: redis.default.svc.cluster.local) 사용을 권장합니다.
+          value: "10.105.216.124" 
+        - name: SPRING_DATA_REDIS_PORT
+          value: "6379"
+        - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+          value: "update"
+        - name: SPRING_TASK_SCHEDULING_ENABLED 
+          value: "false"
+        - name: SPRING_JPA_PROPERTIES_HIBERNATE_JDBC_BATCH_SIZE
+          value: "1000"
+        - name: SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_INSERTS
+          value: "true"
+        - name: SPRING_JPA_PROPERTIES_HIBERNATE_ORDER_UPDATES
+          value: "true"

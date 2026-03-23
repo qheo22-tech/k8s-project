@@ -1,0 +1,55 @@
+#cloud-config
+hostname: k8s-worker-03
+manage_etc_hosts: true
+users:
+  - name: qheo22
+    passwd: "$6$qywhxxrhy385Nfpi$sKyvCY/svYIheZ.SVqKZIE3Kg03BID7KcMpTSatWUbrgNwXl6t46m34aoqTP6lXqdPABVMojYH7VvL11oizY90"
+    lock_passwd: false
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: sudo, admin
+    shell: /bin/bash
+
+chpasswd: { expire: False }
+ssh_pwauth: True
+
+runcmd:
+  - |
+    exec > /dev/console 2>&1
+    echo ">>> [DISK] 루트 파티션 자동 감지 및 확장 시작..."
+    ROOT_PART=$(findmnt -n -o SOURCE /)
+    ROOT_DEV=$(echo ${ROOT_PART} | sed 's/[0-9]*$//')
+    PART_NUM=$(echo ${ROOT_PART} | grep -o '[0-9]*$')
+    
+    growpart ${ROOT_DEV} ${PART_NUM} || echo ">>> [DISK] 확장 불필요"
+    resize2fs ${ROOT_PART}
+ 
+    echo "==============================================="
+    echo ">>> [SYSTEM] 쿠버네티스 인프라 설치를 시작합니다."
+    echo ">>> [SYSTEM] 네트워크 안정화를 위해 15초 대기..."
+    chown -R qheo22:qheo22 /home/qheo22
+    sleep 15
+
+    echo ">>> [GIT] 비공개 저장소 클론 중..."
+    sudo -u qheo22 rm -rf /home/qheo22/k8s-project
+    sudo -u qheo22 git clone https://github.com/qheo22-tech/k8s-project.git
+
+    BASE="/home/qheo22/k8s-project/my-k8s-infrastructure/infra"
+
+    echo ">>> [INSTALL] 00. OS 초기화 실행..."
+    chmod +x $BASE/00_node_os_init/os_init_run.sh
+    bash $BASE/00_node_os_init/os_init_run.sh
+
+    echo ">>> [INSTALL] 01. OS 튜닝 실행..."
+    chmod +x $BASE/01_node_os_tuning/performance_tuning_run.sh
+    bash $BASE/01_node_os_tuning/performance_tuning_run.sh
+
+    echo ">>> [INSTALL] 02. 컨테이너 런타임 설치 실행..."
+    chmod +x $BASE/02_node_container_runtime/os_container_run.sh
+    bash $BASE/02_node_container_runtime/os_container_run.sh
+
+    echo ">>> [INSTALL] 03. K8s 셋업 실행..."
+    chmod +x $BASE/03_node_k8s_setup/os_k8s_run.sh
+    bash $BASE/03_node_k8s_setup/os_k8s_run.sh
+
+    echo ">>> [SUCCESS] 모든 자동 설치 과정이 끝났습니다!"
+    echo "==============================================="

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service  
+  namespace: board-was
+spec:
+  type: ClusterIP
+  selector:
+    app: web-frontend # 웹 파드 배포 시 이 라벨을 사용할 예정
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

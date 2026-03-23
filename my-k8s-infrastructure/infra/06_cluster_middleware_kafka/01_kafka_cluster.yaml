@@ -1,0 +1,82 @@
+# ==============================================================================
+# [01_kafka_cluster.yaml]
+# 역할: 카프카 서버 클러스터 설정 (KRaft 모드)
+# 특징: 1. 사용자가 직접 지정한 kafka=true 라벨 노드에만 배치 (worker2, 5, 7)
+#        2. 물리 서버(main, sub) 간의 데이터 복제 및 분산 보장
+# ==============================================================================
+
+# 1. 노드 풀 설정 (물리적 위치 및 역할 지정)
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: mixed-node-pool
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: my-cluster
+spec:
+  replicas: 3 # kafka=true 라벨이 붙은 노드가 딱 3대이므로 각각 1대씩 들어갑니다.
+  roles:
+    - broker
+    - controller
+  storage:
+    type: persistent-claim
+    size: 10Gi
+    class: longhorn
+    deleteClaim: false
+  template:
+    pod:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kafka           # <--- KAFKA 열의 이름표 확인
+                    operator: In
+                    values:
+                      - "true"           # <--- true 라고 적힌 노드만 조준
+
+---
+
+# 2. 카프카 클러스터 설정
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: my-cluster
+  namespace: kafka
+  annotations:
+    strimzi.io/kraft: enabled
+    strimzi.io/node-pools: enabled
+spec:
+  kafka:
+    version: 3.8.0
+    # --- [리소스 및 메모리 설정 삽입] ---
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "2Gi"
+      limits:
+        cpu: "1000m"
+        memory: "4Gi"    # 8GB 노드의 절반 할당
+    jvmOptions:
+      "-Xms": "2G"      # JVM 힙 메모리 2GB
+      "-Xmx": "2G"
+    # ----------------------------------
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+    config:
+      metadata.version: "3.8-IV0"
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 3
+      min.insync.replicas: 2
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

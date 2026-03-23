@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: kube-system
+  labels:
+    app: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        app: node-exporter
+    spec:
+      hostPID: true
+      hostIPC: true
+      hostNetwork: true
+      containers:
+        - name: node-exporter
+          image: prom/node-exporter:latest
+          # [핵심] 기존 9100번과 충돌을 피하기 위해 9101번 포트 사용 강제
+          args:
+            - "--web.listen-address=:9101"
+          ports:
+            - containerPort: 9101
+              hostPort: 9101
+              name: http
+          resources:
+            limits:
+              cpu: 250m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+      # 마스터 노드에도 강제로 띄우기 위한 설정 (Taint 무시)
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
