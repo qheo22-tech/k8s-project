@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-was-ingress
+  namespace: ai-service
+  annotations:
+    # 경로 끝에 /가 붙어도 잘 작동하게 해주는 마법의 주석
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-was-service  # <--- svc 이름 일치 확인
+            port:
+              number: 80          # <--- svc 포트(80) 일치 확인
