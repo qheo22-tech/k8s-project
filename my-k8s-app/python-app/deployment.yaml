@@ -1,0 +1,56 @@
+# =========================================================
+# [Python 데이터 브릿지 앱 - v1.2]
+# - 네임스페이스: ai-service
+# - 물리 구성: 미니PC(02, 03번 노드) <-> 허브 <-> GPU PC(192.168.0.8)
+# =========================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-was-bridge
+  namespace: ai-service  # <--- 네임스페이스 변경 완료
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-was
+  template:
+    metadata:
+      labels:
+        app: ai-was
+    spec:
+      affinity:
+        # 1. 'role=py-was' 라벨이 붙은 미니PC 노드로 보냄 (02, 03번)
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: role
+                operator: In
+                values: ["py-was"]
+        # 2. 동일한 앱이 같은 노드에 뜨지 않게 찢어서 배치 (고가용성)
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: ai-was
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: ai-was-container
+        image: qheo22/ai-was:v1
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        # FastAPI 서버 주소 (GPU PC: 192.168.0.8)
+        - name: GPU_SERVER_URL
+          value: "http://192.168.0.8:8000"
+        ports:
+        - containerPort: 8000
