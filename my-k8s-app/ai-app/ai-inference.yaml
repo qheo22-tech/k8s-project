@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-inference
+  namespace: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-inference
+  template:
+    metadata:
+      labels:
+        app: ai-inference
+    spec:
+      # 🚀 [핵심] 윈도우/WSL2의 가상망 문제를 해결하기 위해 호스트 네트워크 직접 사용
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet 
+      
+      nodeSelector:
+        gpu: "true"
+      containers:
+      - name: inference-container
+        image: vllm/vllm-openai:v0.5.5
+        # [추가] 0번 GPU만 사용하도록 환경 변수 강제 주입
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+        args:
+        - "--model"
+        - "/models/Llama-3-Open-Ko-8B-Instruct-preview"
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8000"
+        # [수정] GPU 1개만 사용하므로 2 -> 1로 변경 (0번 GPU 전용)
+        - "--tensor-parallel-size"
+        - "1"
+        # [수정] WSL2 메모리 및 GPU 1번(학습용) 여유를 위해 0.85 -> 0.7로 조정
+        - "--gpu-memory-utilization"
+        - "0.85"
+        - "--dtype"
+        - "bfloat16"
+        - "--max-model-len"
+        - "4096"
+        - "--trust-remote-code"
+        - "--disable-custom-all-reduce"
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "4"
+            # [수정] WSL2 총 메모리 32Gi 고려하여 24Gi -> 16Gi로 하향 (학습용 파드 자리 확보)
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+          limits:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 200
+          periodSeconds: 10
+        volumeMounts:
+        - name: model-disk
+          mountPath: /models
+        - name: dshm
+          mountPath: /dev/shm
+      volumes:
+      - name: model-disk
+        hostPath:
+          path: /mnt/d/AI_Project/models
+          type: Directory
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          # [수정] 공유 메모리도 전체 메모리 고려하여 살짝 조정
+          sizeLimit: "8Gi"

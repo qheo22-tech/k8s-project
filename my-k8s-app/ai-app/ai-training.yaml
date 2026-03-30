@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job  # 🚀 학습은 완료 후 종료되어야 하므로 Deployment 대신 Job을 씁니다.
+metadata:
+  name: ai-training
+  namespace: ai-service
+spec:
+  template:
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        gpu: "true"
+      containers:
+      - name: training-container
+        image: qheo22/ai-training:v1  # 👈 곧 빌드할 학습 전용 이미지
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "1"  # 👈 1번 GPU만 사용 (추론 파드와 충돌 방지)
+        - name: MODEL_PATH
+          value: "/models/Llama-3-Open-Ko-8B-Instruct-preview"
+        - name: SAVE_PATH
+          value: "/models/Llama-3-Ko-FineTuned" # 👈 학습 결과가 저장될 곳
+        resources:
+          requests:
+            cpu: "4"
+            memory: "16Gi" # 👈 WSL2 32GB 중 남은 절반 활용
+            nvidia.com/gpu: 1
+          limits:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: model-disk
+          mountPath: /models
+        - name: dshm
+          mountPath: /dev/shm
+      restartPolicy: Never # 💡 학습 에러 시 무한 재시작 방지
+      volumes:
+      - name: model-disk
+        hostPath:
+          path: /mnt/d/AI_Project/models
+          type: Directory
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "8Gi"

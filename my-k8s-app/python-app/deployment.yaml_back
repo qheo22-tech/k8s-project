@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-web-app
+  namespace: ai-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-web-app
+  template:
+    metadata:
+      labels:
+        app: ai-web-app
+    spec:
+      # [스케줄링] 워커 노드 분산 배치 설정
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: role
+                operator: In
+                values: ["py-was"]
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: ai-web-app
+            topologyKey: "kubernetes.io/hostname"
+      
+      containers:
+      - name: web-app-container
+        image: qheo22/ai-web-app:v11
+        imagePullPolicy: Always
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: GPU_SERVER_URL
+          # 🚀 핵심 수정 부분: /chat을 제거한 주소를 강제로 주입합니다.
+          # 이 설정이 들어가면 파이썬 코드의 기본값(os.getenv의 2번째 인자)은 무시됩니다.
+          #value: "http://192.168.0.8:30100/v1/chat/completions"
+          value: "http://192.168.0.47:8000/v1"
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

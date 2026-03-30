@@ -1,0 +1,3 @@
+nodeSelector:
+  gpu: "true"
+affinity: {}  # 기본 깐깐한 조건들을 싹 다 비워버림(무시함)!

@@ -1,56 +1,57 @@
-# =========================================================
-# [Python 데이터 브릿지 앱 - v1.2]
-# - 네임스페이스: ai-service
-# - 물리 구성: 미니PC(02, 03번 노드) <-> 허브 <-> GPU PC(192.168.0.8)
-# =========================================================
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ai-was-bridge
-  namespace: ai-service  # <--- 네임스페이스 변경 완료
+  name: ai-web-app
+  namespace: ai-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: ai-was
+      app: ai-web-app
   template:
     metadata:
       labels:
-        app: ai-was
+        app: ai-web-app
     spec:
-      affinity:
-        # 1. 'role=py-was' 라벨이 붙은 미니PC 노드로 보냄 (02, 03번)
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: role
-                operator: In
-                values: ["py-was"]
-        # 2. 동일한 앱이 같은 노드에 뜨지 않게 찢어서 배치 (고가용성)
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app: ai-was
-            topologyKey: "kubernetes.io/hostname"
       containers:
-      - name: ai-was-container
-        image: qheo22/ai-was:v1
-        imagePullPolicy: Always
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        env:
-        - name: PYTHONUNBUFFERED
-          value: "1"
-        # FastAPI 서버 주소 (GPU PC: 192.168.0.8)
-        - name: GPU_SERVER_URL
-          value: "http://192.168.0.8:8000"
+      - name: web-container
+        image: qheo22/ai-web-app:v18 # 👈 최신 이미지 확인
         ports:
         - containerPort: 8000
+        env:
+        - name: GPU_SERVER_URL
+          value: "http://192.168.0.47:8000/v1/chat/completions"
+        - name: MODEL_NAME
+          value: "/models/Llama-3-Open-Ko-8B-Instruct-preview"
+        - name: TRAINING_SERVER_URL
+          value: "http://gpu-training-service.ai-service.svc.cluster.local:9000/upload"
+        - name: MAX_TOKENS
+          value: "512"
+        - name: TEMPERATURE
+          value: "0.2"
+
+        # 🚀 [수정] 볼륨 관련 설정(volumeMounts)을 모두 삭제했습니다.
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "511Mi"
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+
+        # 🚀 [수정] 헬스 체크 경로를 / 로 수정 (CrashLoop 방지)
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+      # 🚀 [수정] 하단 volumes 섹션도 모두 삭제했습니다.
