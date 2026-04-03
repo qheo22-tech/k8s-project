@@ -3,11 +3,15 @@ kind: Service
 metadata:
   name: ai-inference-service
   namespace: ai-service
+  annotations:
+    # MetalLB가 설치되어 있다면 이 어노테이션으로 IP를 고정할 수 있습니다.
+    # 사용 중인 IP 대역(192.168.0.x) 중 비어있는 IP 하나를 지정하세요.
+    metallb.universe.tf/loadBalancerIPs: "192.168.0.250" 
 spec:
-  type: NodePort  # ClusterIP → NodePort
+  type: LoadBalancer    # NodePort 대신 LoadBalancer 사용
   selector:
     app: ai-inference
   ports:
-  - port: 8000         # Service 내부 포트
-    targetPort: 8000   # Pod 컨테이너 포트
-    nodePort: 30100    # 외부에서 접근할 포트 (30000~32767 사이)
+  - port: 8000          # 서비스 포트
+    targetPort: 8000    # Pod 컨테이너 포트
+    protocol: TCP

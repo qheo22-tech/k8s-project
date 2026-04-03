@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-inference
+  namespace: ai-service
+spec:
+  replicas: 1
+  # 🚀 [유지] GPU 1개 환경에서 기존 파드와 충돌을 방지하기 위해 Recreate 전략 사용
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ai-inference
+  template:
+    metadata:
+      labels:
+        app: ai-inference
+    spec:
+      # 🚀 [유지] 윈도우/WSL2의 가상망 문제를 해결하기 위해 호스트 네트워크 직접 사용
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+
+      nodeSelector:
+        gpu: "true"
+
+      # ✅ [수정1] WSL CUDA 경로 문제 해결을 위해 initContainer 추가
+      # 컨테이너 뜨기 전에 호스트의 libcuda.so 를 컨테이너가 찾을 수 있도록 심볼릭 링크 생성
+      initContainers:
+      - name: cuda-fix
+        image: busybox
+        command: ['sh', '-c', 'mkdir -p /usr/local/lib && ln -sf /usr/lib/wsl/lib/libcuda.so.1 /usr/local/lib/libcuda.so']
+        volumeMounts:
+        - name: wsl-lib
+          mountPath: /usr/lib/wsl/lib
+
+      containers:
+      - name: inference-container
+        image: vllm/vllm-openai:v0.5.5
+        env:
+        # [유지] 0번 GPU만 사용하도록 환경 변수 강제 주입
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        # ✅ [수정2] triton이 libcuda 찾을 수 있도록 WSL 라이브러리 경로 추가
+        - name: LD_LIBRARY_PATH
+          value: "/usr/lib/wsl/lib:/usr/local/lib"
+        command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+        args:
+        - "--model"
+        - "/models/Llama-3-Open-Ko-8B-Instruct-preview"
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8000"
+        - "--tensor-parallel-size"
+        - "1"
+        - "--gpu-memory-utilization"
+        - "0.85"
+        - "--dtype"
+        - "bfloat16"
+        - "--max-model-len"
+        - "4096"
+        - "--trust-remote-code"
+        - "--disable-custom-all-reduce"
+        - "--enable-lora"
+        - "--lora-modules"
+        - "llama3-ko-finetuned=/models/Llama-3-Ko-FineTuned/lora_adapter"
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+          limits:
+            cpu: "4"
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 600
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 500
+          periodSeconds: 10
+        volumeMounts:
+        - name: model-disk
+          mountPath: /models
+        - name: dshm
+          mountPath: /dev/shm
+        # ✅ [수정3] initContainer에서 만든 심볼릭 링크를 메인 컨테이너도 공유
+        - name: wsl-lib
+          mountPath: /usr/lib/wsl/lib
+
+      volumes:
+      - name: model-disk
+        hostPath:
+          path: /mnt/d/AI_Project/models
+          type: Directory
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "8Gi"
+      # ✅ [수정4] 호스트의 WSL CUDA 라이브러리를 컨테이너 안에서 쓸 수 있게 마운트
+      - name: wsl-lib
+        hostPath:
+          path: /usr/lib/wsl/lib
+          type: Directory

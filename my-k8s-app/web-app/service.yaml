@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-web-service        # 이름 변경: ai-was-service -> ai-web-service
+  namespace: ai-service
+spec:
+  type: LoadBalancer          # MetalLB 설정 유지 (192.168.0.240 할당)
+  ports:
+  - port: 80
+    targetPort: 8100
+  selector:
+    app: ai-web-app           # 👈 중요! Deployment의 labels와 똑같이 맞춰야 연결됩니다.

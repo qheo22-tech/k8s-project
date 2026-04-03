@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: llama3-train-job
+  namespace: ai-service  
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        gpu: "true"
+      containers:
+        - name: trainer
+          image: qheo22/ai-training:v2 
+          imagePullPolicy: Always
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              # CUDA 링크 작업은 컨테이너가 뜰 때마다 해줘야 하니 남겨둡니다.
+              mkdir -p /tmp/lib
+              LIBCUDA_PATH=$(find /usr/lib/wsl/drivers -name "libcuda.so.1" | head -n 1)
+              ln -sf "$LIBCUDA_PATH" /tmp/lib/libcuda.so
+              export LIBRARY_PATH=/tmp/lib:$LIBRARY_PATH
+              export LD_LIBRARY_PATH=/tmp/lib:$LD_LIBRARY_PATH
+              
+              cd /tmp
+              python3 -u /app/train.py  
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            # ... (환경변수는 그대로 유지)
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: data
+              mountPath: /data
+            # 🗑️ 여기서 'code' 마운트가 지워진 겁니다!
+      volumes:
+        - name: models
+          hostPath:
+            path: /mnt/d/AI_Project/models 
+        - name: data
+          hostPath:
+            path: /mnt/d/AI_Project/data
+        # 🗑️ 여기서 'code' 볼륨 설정이 지워진 겁니다!

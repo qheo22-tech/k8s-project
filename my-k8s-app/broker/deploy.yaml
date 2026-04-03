@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: broker-config
+  namespace: ai-service
+data:
+  UPLOAD_DIR: "/data"
+  MAX_FILE_SIZE_MB: "500"
+  ALLOWED_EXTENSIONS: "jsonl,json,csv"
+  FILENAME: "dataset.jsonl"
+  PORT: "9000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broker-server
+  namespace: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broker-server
+  template:
+    metadata:
+      labels:
+        app: broker-server
+    spec:
+      nodeSelector:
+        gpu: "true"
+      tolerations:
+      - key: "node.kubernetes.io/network-unavailable"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: broker-server
+        image: qheo22/broker-server:v2
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: broker-config
+        volumeMounts:
+        - name: data-storage
+          mountPath: /data              
+      volumes:
+      - name: data-storage
+        hostPath:
+          path: /mnt/d/AI_Project/data 
+          type: DirectoryOrCreate

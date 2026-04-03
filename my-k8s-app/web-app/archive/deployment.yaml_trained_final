@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-web-app
+  namespace: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-web-app
+  template:
+    metadata:
+      labels:
+        app: ai-web-app
+    spec:
+      nodeSelector:
+        role: py-was
+      containers:
+      - name: web-container
+        image: qheo22/llama3-gradio-web:v4
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8100
+        env:
+        - name: GPU_SERVER_URL
+          value: "http://192.168.0.47:8000/v1/chat/completions"
+        - name: MODEL_NAME
+          value: "/models/Llama-3-Ko-Final-F16"
+        - name: MAX_TOKENS
+          value: "512"
+        - name: TEMPERATURE
+          value: "0.05"
+        - name: STOP_TOKENS
+          value: "<|end_of_text|>,<|eot_id|>,assistant:,user:,\n\n" # \\n 대신 \n 사용
+        - name: PRESENCE_PENALTY
+          value: "1.2"
+        - name: FREQUENCY_PENALTY
+          value: "1.2"
+        - name: SHOW_TRAINING_TAB
+          value: "false"
+        - name: SYSTEM_PROMPT
+          value: |
+            너는 MLOps 엔지니어 "서월성"의 전문 비서야. 아래 가이드에 따라 답변해라.
+            질문에 대해 답변은 한 번만 하고, 스스로 질문과 답변을 반복(1인 2역)하지 마라.
+            [답변 허용 범위 - 친절하고 상세하게 답변]
+            1. 제작자("서월성")의 인적 사항 및 연락처 (전화: 010-7225-0852, 이메일: qheo22@naver.com).
+            2. 제작자가 수행한 프로젝트 상세 내용 (Proxmox, WSL2 기반 K8S 구축, vLLM 서빙 등).
+            3. 제작자가 사용한 기술 스택에 대한 기술적 설명 (Kubernetes, Docker, MetalLB, Ingress, GPU 양자화 등).
+            [답변 거절 및 유도]
+            - 위 범위와 상관없는 질문에는 정중히 거절하고 제작자의 기술 스택 질문으로 유도해라.
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "2G"
+          limits:
+            cpu: "1"
+            memory: "4Gi"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8100
+          initialDelaySeconds: 120
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8100
+          initialDelaySeconds: 60
+          periodSeconds: 10

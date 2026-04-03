@@ -13,49 +13,44 @@ spec:
       labels:
         app: ai-inference
     spec:
+      # 🚀 [핵심] 윈도우/WSL2의 가상망 문제를 해결하기 위해 호스트 네트워크 직접 사용
       hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      dnsPolicy: ClusterFirstWithHostNet 
+      
       nodeSelector:
         gpu: "true"
       containers:
       - name: inference-container
-        # 1. 직접 빌드한 v2 이미지 사용
-        image: qheo22/llama3-ko-inference:v2
-        imagePullPolicy: Always
-        env:
-        - name: CUDA_VISIBLE_DEVICES
-          value: "0"
+        image: vllm/vllm-openai:v0.5.5
         command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
         args:
         - "--model"
-        # 2. 컨테이너 내부 마운트 경로 (그대로 유지)
-        - "/models/Llama-3-Ko-Final-F16"
+        - "/models/Llama-3-Open-Ko-8B-Instruct-preview"
         - "--host"
         - "0.0.0.0"
         - "--port"
         - "8000"
         - "--tensor-parallel-size"
-        - "1"
+        - "2"
         - "--gpu-memory-utilization"
         - "0.85"
         - "--dtype"
-        - "float16"
+        - "bfloat16"
         - "--max-model-len"
         - "4096"
         - "--trust-remote-code"
         - "--disable-custom-all-reduce"
         ports:
         - containerPort: 8000
-          hostPort: 8000
         resources:
           requests:
             cpu: "4"
-            memory: "16Gi"
-            nvidia.com/gpu: 1
+            memory: "24Gi"
+            nvidia.com/gpu: 2
           limits:
             cpu: "4"
-            memory: "16Gi"
-            nvidia.com/gpu: 1
+            memory: "24Gi"
+            nvidia.com/gpu: 2
         livenessProbe:
           httpGet:
             path: /health
@@ -76,11 +71,9 @@ spec:
       volumes:
       - name: model-disk
         hostPath:
-          # 3. 🚀 실제 WSL2 내 모델 저장 위치로 수정
-          # (~/ai_project/merged/Llama-3-Ko-Final-F16 가 있는 상위 폴더)
-          path: /home/qheo22/ai_project/merged
+          path: /mnt/d/AI_Project/models
           type: Directory
       - name: dshm
         emptyDir:
           medium: Memory
-          sizeLimit: "8Gi"
+          sizeLimit: "16Gi"

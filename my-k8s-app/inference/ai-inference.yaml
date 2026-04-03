@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-inference
+  namespace: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-inference
+  template:
+    metadata:
+      labels:
+        app: ai-inference
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        gpu: "true"
+      containers:
+        - name: inference-container
+          # 1. 이미지 변경 (v2로 교체)
+          image: qheo22/llama3-ko-inference:v2
+          imagePullPolicy: Always
+          env:
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0"
+          # 2. command 섹션 삭제 가능! (Dockerfile의 ENTRYPOINT가 대신함)
+          # command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]  <-- 삭제
+
+          # 3. args 섹션: 파라미터만 주입 (중복 제거)
+          args:
+            - "--model"
+            - "/models/Llama-3-Ko-Final-F16"  # 👈 컨테이너 안에서 '실제 모델 파일'이 있는 폴더 지정
+            - "--served-model-name"
+            - "Llama-3-Ko-Final-F16"
+            - "--gpu-memory-utilization"
+            - "0.85"
+            - "--trust-remote-code"
+            # --tokenizer는 모델 경로와 같으면 보통 생략 가능합니다.
+          ports:
+            - containerPort: 8000
+
+          # 4. Probe 설정 (유지 권장)
+          # 모델 로딩 시간이 걸리므로 이 설정은 그대로 두는 게 서비스 안정성에 좋습니다.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 20
+
+          volumeMounts:
+            - name: model-disk
+              mountPath: /models  # 👈 컨테이너 내부 경로 통일
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: model-disk
+          hostPath:
+            path: /home/qheo22/ai_project/merged
+            type: Directory
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-web-app
+  namespace: ai-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-web-app
+  template:
+    metadata:
+      labels:
+        app: ai-web-app
+    spec:
+      containers:
+      - name: web-container
+        image: qheo22/ai-web-app:v17
+        ports:
+        - containerPort: 8000
+        env:
+        - name: GPU_SERVER_URL
+          value: "http://192.168.0.47:8000/v1/chat/completions"
+        - name: MODEL_NAME
+          value: "Llama-3-Ko-Final-F16"
+        - name: MAX_TOKENS
+          value: "512"  
+        - name: TEMPERATURE
+          value: "0.2"         
+        # [신규 추가] 컨테이너 내부 경로와 볼륨 연결
+        volumeMounts:
+        - name: model-disk
+          mountPath: /models
+        - name: data-disk
+          mountPath: /data    # 👈 app.py의 DATA_DIR("/data")와 일치시킴
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "511Mi"
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+            
+      # [신규 추가] 실제 물리 경로(D드라이브) 정의
+      volumes:
+      - name: model-disk
+        hostPath:
+          path: /mnt/d/AI_Project/models
+          type: Directory
+      - name: data-disk
+        hostPath:
+          path: /mnt/d/AI_Project/data
+          type: DirectoryOrCreate  

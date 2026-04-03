@@ -1,0 +1,104 @@
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  creationTimestamp: "2026-03-25T11:58:24Z"
+  finalizers:
+  - tigera.io/operator-cleanup
+  generation: 3
+  name: default
+  resourceVersion: "1154058"
+  uid: 340a3969-6b38-40f9-82a1-6a39b7537d9d
+spec:
+  calicoNetwork:
+    bgp: Enabled
+    hostPorts: Enabled
+    ipPools:
+    - blockSize: 26
+      cidr: 10.244.0.0/16
+      disableBGPExport: false
+      encapsulation: VXLANCrossSubnet
+      natOutgoing: Enabled
+      nodeSelector: all()
+    linuxDataplane: Iptables
+    multiInterfaceMode: None
+    nodeAddressAutodetectionV4:
+      interface: eth.*
+    windowsDataplane: Disabled
+  cni:
+    ipam:
+      type: Calico
+    type: Calico
+  controlPlaneReplicas: 2
+  flexVolumePath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
+  kubeletVolumePluginPath: /var/lib/kubelet
+  logging:
+    cni:
+      logFileMaxAgeDays: 30
+      logFileMaxCount: 10
+      logFileMaxSize: 100Mi
+      logSeverity: Info
+  nodeUpdateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+  nonPrivileged: Disabled
+  variant: Calico
+status:
+  calicoVersion: v3.27.0
+  computed:
+    calicoNetwork:
+      bgp: Enabled
+      hostPorts: Enabled
+      ipPools:
+      - blockSize: 26
+        cidr: 10.244.0.0/16
+        disableBGPExport: false
+        encapsulation: VXLANCrossSubnet
+        natOutgoing: Enabled
+        nodeSelector: all()
+      linuxDataplane: Iptables
+      multiInterfaceMode: None
+      nodeAddressAutodetectionV4:
+        firstFound: true
+      windowsDataplane: Disabled
+    cni:
+      ipam:
+        type: Calico
+      type: Calico
+    controlPlaneReplicas: 2
+    flexVolumePath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
+    kubeletVolumePluginPath: /var/lib/kubelet
+    logging:
+      cni:
+        logFileMaxAgeDays: 30
+        logFileMaxCount: 10
+        logFileMaxSize: 100Mi
+        logSeverity: Info
+    nodeUpdateStrategy:
+      rollingUpdate:
+        maxUnavailable: 1
+      type: RollingUpdate
+    nonPrivileged: Disabled
+    variant: Calico
+  conditions:
+  - lastTransitionTime: "2026-04-02T14:36:30Z"
+    message: 'Invalid Installation provided: no more than one node address autodetection
+      method can be specified per-family'
+    observedGeneration: 3
+    reason: InvalidConfigurationError
+    status: "True"
+    type: Degraded
+  - lastTransitionTime: "2026-04-02T14:36:30Z"
+    message: ""
+    observedGeneration: 3
+    reason: Unknown
+    status: "False"
+    type: Ready
+  - lastTransitionTime: "2026-04-02T14:36:30Z"
+    message: ""
+    observedGeneration: 3
+    reason: Unknown
+    status: "False"
+    type: Progressing
+  mtu: 1450
+  variant: Calico

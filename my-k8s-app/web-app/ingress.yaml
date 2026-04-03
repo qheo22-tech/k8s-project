@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-web-ingress
+  namespace: ai-service
+spec:
+  ingressClassName: nginx  # 👈 이 줄이 꼭 있어야 IP가 할당됩니다!
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-web-service
+            port:
+              number: 80
